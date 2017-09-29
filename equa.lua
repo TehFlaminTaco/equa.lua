@@ -122,8 +122,12 @@ function _eq.__tostring(a)
 	end
 	local t = {}
 	for k,v in pairs(a.args) do
-		t[k] = tostring(v)
-		t[k] = tonumber(t[k]) or t[k]
+		if(type(v)=="string")then
+			t[k] = ("%q"):format(v)
+		else
+			t[k] = tostring(v)
+			t[k] = tonumber(t[k]) or t[k]
+		end
 	end
 	return type(a.format)=="function" and a.format(table.unpack(t)) or a.format:format(table.unpack(t))
 end
@@ -160,7 +164,6 @@ function call(...)
 		end
 	end
 	if run then
-		print(args[1])
 		return table.remove(args,1)(table.unpack(args))
 	else
 		return setmetatable({args = args, pre = 0, action = "call", format = function(...) return "call("..table.concat({...},",")..")" end, tex = function(...) return "\\text{call}\\left({"..table.concat({...},",").."}\\right)" end, func = call},_eq)
@@ -202,6 +205,80 @@ function len(tab)
 		return #tab
 	end
 end
+
+function makeFunky(val)
+	if(isEq(val))then
+		return #val
+	end
+	if type(val) == "function" then
+		return val
+	end
+	return function()return val end
+end
+
+function truthy(cond)
+	if(type(cond) == 'number')then
+		cond = cond ~= 0
+	end
+	return cond
+end
+
+function branch(cond,truthy,falsey,...)
+	truthy = makeFunky(truthy)
+	falsey = makeFunky(falsey)
+	if(isEq(cond)) then
+		return setmetatable({args = {cond,truthy,falsey,...}, pre=0, action="branch", format = function(...) return "branch("..table.concat({...},",")..")" end, tex = function(...) return "\\text{branch}\\left({"..table.concat({...},",").."}\\right)" end,func = branch},_eq)
+	else
+		if truthy(cond) then
+			return truthy(...)
+		else
+			return falsey(...)
+		end
+	end
+end
+
+function floop(first,cond,whilst,body,...)
+	for k,v in pairs{first,...} do
+		if(isEq(v))then
+			cond = makeFunky(cond)
+			whilst = makeFunky(whilst)
+			body = makeFunky(body)
+			return setmetatable({args = {first,cond,whilst,body,...}, action = "floop", format = function(...)return "floop("..table.concat({...},',')..")"end, tex = function(...) return "\\text{floop}\\left({"..table.concat({...},",").."}\\right)" end, func = floop},_eq)
+		end
+	end
+
+	local i = makeFunky(first)()
+	local last
+	while(truthy(cond(i,...)))do
+		last = body(i,...)
+		i = whilst(i,...)
+	end
+	return last
+end
+
+function wloop(cond, body, last, ...)
+	for k,v in pairs{...} do
+		if(isEq(v))then
+			cond = makeFunky(cond)
+			body = makeFunky(body)
+			return setmetatable({args = {cond,body,...}, action = "wloop", format = function(...)return "wloop("..table.concat({...},',')..")"end, tex = function(...) return "\\text{wloop}\\left({"..table.concat({...},",").."}\\right)" end, func = wloop},_eq)
+		end
+	end
+	while(truthy(cond(last,...)))do
+		last = body(last,...)
+	end
+	return last
+end
+
+lt = wrap(function(a,b)return a<b and 1 or 0 end, "lt")
+gt = wrap(function(a,b)return a>b and 1 or 0 end, "gt")
+le = wrap(function(a,b)return a<=b and 1 or 0 end, "le")
+ge = wrap(function(a,b)return a>=b and 1 or 0 end, "ge")
+eq = wrap(function(a,b)return a==b and 1 or 0 end, "eq")
+ne = wrap(function(a,b)return a~=b and 1 or 0 end, "ne")
+nt = wrap(function(a)return truthy(a) and 0 or 1 end, "nt")
+orr = wrap(function(a,b)return a or b end, "or")
+andd = wrap(function(a,b)return a and b end, "and")
 
 for k,v in pairs(string) do
 	if(type(v)=="function")then
