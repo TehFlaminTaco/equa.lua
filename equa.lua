@@ -1,4 +1,5 @@
 local _eq = {}
+_eq.private = {isEq = true, func = true, name = true, pre = true, format = true, tex = true, args = true, inp = true}
 
 function _eq.__call(eq, data, ...)
 	if (type(data)~="table" or isEq(data)) then
@@ -324,7 +325,15 @@ for k,v in pairs(io) do
 	end
 end
 
-_eq.__index = _eq
+_eq.__index = function(ent,key)
+	if _eq[key] then
+		return _eq[key]
+	end
+	if(ent.private[key])then
+		return nil
+	end
+	return setmetatable({args = {ent, key}, pre = 0, action = 'index', format = '%s[%s]', tex = '%s[%s]', func = function(a,b)return a[b] end},_eq)
+end
 
 function toTeX(a)
 	if(type(a)=="string")then
